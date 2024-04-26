@@ -6,28 +6,23 @@ generator client {
 }
 
 datasource db {
-  provider     = "mysql"
+  provider     = "mongodb"
   url          = env("DATABASE_URL")
   relationMode = "prisma"
 }
 
-enum VoteType {
-  UP
-  DOWN
-}
-
 model Account {
-  id                String  @id @default(cuid())
-  userId            String
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
   type              String
   provider          String
   providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String? @db.String
+  access_token      String? @db.String
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String? @db.String
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -36,102 +31,108 @@ model Account {
 }
 
 model Session {
-  id           String   @id @default(cuid())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
   sessionToken String   @unique
-  userId       String
+  userId       String   @db.ObjectId
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
-  id                String         @id @default(cuid())
+  id                String      @id @default(auto()) @map("_id") @db.ObjectId
   name              String?
-  email             String?        @unique
+  email             String?     @unique
   emailVerified     DateTime?
-  createdSubreddits Subreddit[]    @relation("CreatedBy")
-  subscriptions     Subscription[]
-  votes             Vote[]
+  createdSubreddits Subreddit[] @relation("CreatedBy")
 
   username String? @unique
 
   image       String?
   accounts    Account[]
   sessions    Session[]
-  Post        Post[]
-  Comment     Comment[]
+  posts       Post[]
+  comments    Comment[]
   CommentVote CommentVote[]
+  votes       Vote[]
+
+  Subscription Subscription[]
 }
 
 model Subreddit {
-  id        String   @id @default(cuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   posts     Post[]
 
-  creatorId   String?
-  Creator     User?          @relation("CreatedBy", fields: [creatorId], references: [id])
-  subscribers Subscription[]
-
-  @@index([name])
+  creatorId  String         @db.ObjectId
+  creator    User?          @relation("CreatedBy", fields: [userId], references: [id])
+  subscriber Subscription[]
+  userId     String?        @db.ObjectId
 }
 
 model Subscription {
-  user        User      @relation(fields: [userId], references: [id])
-  userId      String
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  user        User?     @relation(fields: [userId], references: [id])
+  userId      String    @db.ObjectId
   subreddit   Subreddit @relation(fields: [subredditId], references: [id])
-  subredditId String
-
-  @@id([userId, subredditId])
+  subredditId String    @db.ObjectId
 }
 
 model Post {
-  id          String    @id @default(cuid())
-  title       String
-  content     Json?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  author      User      @relation(fields: [authorId], references: [id])
-  authorId    String
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  title     String?
+  content   Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   subreddit   Subreddit @relation(fields: [subredditId], references: [id])
-  subredditId String
-  comments    Comment[] 
-  votes       Vote[]
+  subredditId String    @db.ObjectId
+
+  author   User   @relation(fields: [authorId], references: [id])
+  authorId String @db.ObjectId
+
+  comments Comment[]
+  votes    Vote[]
 }
 
 model Comment {
-  id        String   @id @default(cuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   text      String
   createdAt DateTime @default(now())
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  String
-  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId    String
+  author    User     @relation(fields: [userId], references: [id])
 
-  replyToId String?
+  userId String @db.ObjectId
+  post   Post   @relation(fields: [postId], references: [id])
+  postId String @db.ObjectId
+
   replyTo   Comment?  @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replyToId String?   @db.ObjectId
   replies   Comment[] @relation("ReplyTo")
 
   votes     CommentVote[]
-  commentId String?
+  commentid String
+}
+
+enum VoteType {
+  UP
+  DOWN
 }
 
 model Vote {
+  id     String   @id @default(auto()) @map("_id") @db.ObjectId
   user   User     @relation(fields: [userId], references: [id])
-  userId String
+  userId String   @db.ObjectId
   post   Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
-  postId String
+  postId String   @db.ObjectId
   type   VoteType
-
-  @@id([userId, postId])
 }
 
 model CommentVote {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   user      User     @relation(fields: [userId], references: [id])
-  userId    String
-  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  commentId String
+  userId    String   @db.ObjectId
+  comment   Comment  @relation(fields: [commentId], references: [id])
+  commentId String   @db.ObjectId
   type      VoteType
-
-  @@id([userId, commentId])
 }
